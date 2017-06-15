@@ -60,6 +60,7 @@ public class DaemonParameters {
     }
 
     public DaemonParameters(BuildLayoutParameters layout, Map<String, String> extraSystemProperties) {
+        userDefinedImmutableSystemProperties = containsImmutableSystemProperties(extraSystemProperties);
         jvmOptions.systemProperties(extraSystemProperties);
         baseDir = new File(layout.getGradleUserHomeDir(), "daemon");
         gradleUserHomeDir = layout.getGradleUserHomeDir();
@@ -159,7 +160,7 @@ public class DaemonParameters {
 
     public void setJvmArgs(Iterable<String> jvmArgs) {
         userDefinedImmutableJvmArgs = containsImmutableJvmArgs(jvmArgs);
-        userDefinedImmutableSystemProperties = containsImmutableSystemProperties(jvmArgs);
+        userDefinedImmutableSystemProperties = userDefinedImmutableSystemProperties || containsImmutableSystemProperties(jvmArgs);
         jvmOptions.setAllJvmArgs(jvmArgs);
     }
 
@@ -185,15 +186,25 @@ public class DaemonParameters {
                 } else {
                     key = keyValue.substring(0, equalsIndex);
                 }
-                if (DaemonJvmOptions.IMMUTABLE_SYSTEM_PROPERTIES.contains(key)) {
-                    return true;
-                }
-                if (DaemonJvmOptions.IMMUTABLE_DAEMON_SYSTEM_PROPERTIES.contains(key)) {
+                if (isImmutableSystemProperty(key)) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    private boolean containsImmutableSystemProperties(Map<String, String> propertiesMap) {
+        for (String key : propertiesMap.keySet()) {
+            if (isImmutableSystemProperty(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isImmutableSystemProperty(String key) {
+        return DaemonJvmOptions.IMMUTABLE_SYSTEM_PROPERTIES.contains(key) || DaemonJvmOptions.IMMUTABLE_DAEMON_SYSTEM_PROPERTIES.contains(key);
     }
 
     public void setEnvironmentVariables(Map<String, String> envVariables) {
