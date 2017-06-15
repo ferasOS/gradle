@@ -47,7 +47,8 @@ public class DaemonParameters {
     private final DaemonJvmOptions jvmOptions = new DaemonJvmOptions(new IdentityFileResolver());
     private Map<String, String> envVariables;
     private boolean enabled = true;
-    private boolean hasJvmArgs;
+    private boolean userDefinedImmutableJvmArgs;
+    private boolean userDefinedImmutableSystemProperties;
     private boolean foreground;
     private boolean stop;
     private boolean status;
@@ -75,6 +76,14 @@ public class DaemonParameters {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public boolean hasUserDefinedImmutableJvmArgs() {
+        return userDefinedImmutableJvmArgs;
+    }
+
+    public boolean hasUserDefinedImmutableSystemProperties() {
+        return userDefinedImmutableSystemProperties;
     }
 
     public File getBaseDir() {
@@ -109,6 +118,10 @@ public class DaemonParameters {
         return jvmOptions.getAllSingleUseImmutableJvmArgs();
     }
 
+    public Map<String, Object> getImmutableSystemProperties() {
+        return jvmOptions.getImmutableSystemProperties();
+    }
+
     public JavaInfo getEffectiveJvm() {
         return jvm;
     }
@@ -120,7 +133,7 @@ public class DaemonParameters {
     }
 
     public void applyDefaultsFor(JavaVersion javaVersion) {
-        if (hasJvmArgs) {
+        if (userDefinedImmutableJvmArgs) {
             return;
         }
         if (javaVersion.compareTo(JavaVersion.VERSION_1_9) >= 0) {
@@ -145,8 +158,42 @@ public class DaemonParameters {
     }
 
     public void setJvmArgs(Iterable<String> jvmArgs) {
-        hasJvmArgs = true;
+        userDefinedImmutableJvmArgs = containsImmutableJvmArgs(jvmArgs);
+        userDefinedImmutableSystemProperties = containsImmutableSystemProperties(jvmArgs);
         jvmOptions.setAllJvmArgs(jvmArgs);
+    }
+
+    private boolean containsImmutableJvmArgs(Iterable<String> jvmArgs) {
+        for (Object arg : jvmArgs) {
+            String argStr = arg.toString();
+            if (!argStr.startsWith("-D")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsImmutableSystemProperties(Iterable<String> jvmArgs) {
+        for (Object arg : jvmArgs) {
+            String argStr = arg.toString();
+            if (argStr.startsWith("-D")) {
+                String keyValue = argStr.substring(2);
+                int equalsIndex = keyValue.indexOf("=");
+                String key;
+                if (equalsIndex == -1) {
+                    key = keyValue;
+                } else {
+                    key = keyValue.substring(0, equalsIndex);
+                }
+                if (DaemonJvmOptions.IMMUTABLE_SYSTEM_PROPERTIES.contains(key)) {
+                    return true;
+                }
+                if (DaemonJvmOptions.IMMUTABLE_DAEMON_SYSTEM_PROPERTIES.contains(key)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public void setEnvironmentVariables(Map<String, String> envVariables) {
