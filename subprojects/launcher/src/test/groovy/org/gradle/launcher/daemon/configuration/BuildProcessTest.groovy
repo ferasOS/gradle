@@ -62,6 +62,30 @@ public class BuildProcessTest extends Specification {
         buildProcess.configureForBuild(buildParameters(["-Dfile.encoding=$notDefaultEncoding", "-Xmx100m", "-XX:SomethingElse"])) //both match
         !buildProcess.configureForBuild(buildParameters(["-Dfile.encoding=${Charset.defaultCharset().name()}", "-Xmx100m", "-XX:SomethingElse"]))
         !buildProcess.configureForBuild(buildParameters(["-Dfile.encoding=$notDefaultEncoding", "-Xmx120m", "-XX:SomethingElse"]))
+        buildProcess.configureForBuild(buildParameters(["-Dfoo=bar"]))
+    }
+
+    def "debug is handled as immutable system property"() {
+        when:
+        BuildProcess buildProcess = new BuildProcess(currentJvm, currentJvmOptions)
+        def debugEnabled = buildParameters([])
+        debugEnabled.setDebug(true)
+        def debugDisabled = buildParameters([])
+        debugDisabled.setDebug(false)
+
+        then:
+        !buildProcess.configureForBuild(debugEnabled)
+        buildProcess.configureForBuild(debugDisabled)
+    }
+
+    def "immutable system properties passed into the daemon parameter constructor are handled"() {
+        when:
+        BuildProcess buildProcess = new BuildProcess(currentJvm, currentJvmOptions)
+        def notDefaultEncoding = ["UTF-8", "US-ASCII"].collect { Charset.forName(it) } find { it != Charset.defaultCharset() }
+
+        then:
+        buildProcess.configureForBuild(buildParameters([], [ "file.encoding" : Charset.defaultCharset().name() ]))
+        !buildProcess.configureForBuild(buildParameters([], [ "file.encoding" : notDefaultEncoding.toString() ]))
     }
 
     def "can only run build when no immutable jvm arguments specified that do not match the current immutable jvm arguments"() {
@@ -170,8 +194,12 @@ public class BuildProcessTest extends Specification {
         return buildParameters(currentJvm, jvmArgs)
     }
 
-    private static DaemonParameters buildParameters(JavaInfo jvm, Iterable<String> jvmArgs = []) {
-        def parameters = new DaemonParameters(new BuildLayoutParameters())
+    private DaemonParameters buildParameters(Iterable<String> jvmArgs, Map<String, String> extraSystemProperties) {
+        return buildParameters(currentJvm, jvmArgs, extraSystemProperties)
+    }
+
+    private static DaemonParameters buildParameters(JavaInfo jvm, Iterable<String> jvmArgs = [], Map<String, String> extraSystemProperties = Collections.emptyMap()) {
+        def parameters = new DaemonParameters(new BuildLayoutParameters(), extraSystemProperties)
         parameters.setJvm(jvm)
         if (jvmArgs.iterator().hasNext()) {
             parameters.setJvmArgs(jvmArgs)

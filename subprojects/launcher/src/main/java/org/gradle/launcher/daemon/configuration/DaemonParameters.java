@@ -212,6 +212,7 @@ public class DaemonParameters {
     }
 
     public void setDebug(boolean debug) {
+        userDefinedImmutableSystemProperties = debug;
         jvmOptions.setDebug(debug);
     }
 
